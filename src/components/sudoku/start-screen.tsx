@@ -41,7 +41,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
                             priority
                         />
                     </span>
-                    udoku Game
+                    uccinct Sudoku
                 </h1>
 
                 <div className="text-center space-y-4">

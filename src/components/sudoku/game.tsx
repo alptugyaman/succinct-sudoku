@@ -39,7 +39,7 @@ export function SudokuGame() {
                         priority
                     />
                 </span>
-                udoku Game
+                uccinct Sudoku
             </h1>
 
             <SudokuBoard />
