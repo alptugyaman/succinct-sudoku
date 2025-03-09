@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { ResultModal } from './result-modal';
 
 export function GameControls() {
-    const { startNewGame, isComplete, getElapsedTime, checkSolution, grid, startTime } = useGameStore();
+    const { startNewGame, isComplete, getElapsedTime, checkSolution, grid, originalGrid, startTime } = useGameStore();
     const [showResultModal, setShowResultModal] = useState(false);
     const [isCorrectSolution, setIsCorrectSolution] = useState(false);
     const [elapsedTime, setElapsedTime] = useState(0);
@@ -109,6 +109,8 @@ export function GameControls() {
                     elapsedTime={elapsedTime}
                     onClose={handleCloseModal}
                     onNewGame={handleNewGame}
+                    originalGrid={originalGrid}
+                    currentGrid={grid}
                 />
             )}
         </div>

@@ -1,36 +1,95 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sudoku ZKP (Zero-Knowledge Proof) Uygulaması
 
-## Getting Started
+Bu uygulama, Sudoku çözümlerini doğrulayan ve Zero-Knowledge Proof (ZKP) oluşturan bir web uygulamasıdır. Frontend Next.js ile geliştirilmiştir ve harici bir backend API'ye bağlanır.
 
-First, run the development server:
+## Proje Yapısı
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- `src/`: Kaynak kodları
+  - `app/`: Next.js uygulama dosyaları
+  - `components/`: React bileşenleri
+  - `lib/`: Yardımcı fonksiyonlar ve API servisleri
+
+## Kurulum
+
+### Frontend (Next.js)
+
+1. Bağımlılıkları yükleyin:
+   ```bash
+   npm install
+   ```
+
+2. Geliştirme sunucusunu başlatın:
+   ```bash
+   npm run dev
+   ```
+
+3. Uygulamaya tarayıcıdan erişin: `http://localhost:3000`
+
+### Backend Yapılandırması
+
+Frontend, harici bir backend API'ye bağlanacak şekilde yapılandırılmıştır. Backend URL'ini `.env.local` dosyasında ayarlayabilirsiniz:
+
+```
+NEXT_PUBLIC_API_URL=http://localhost:5000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Üretim ortamında, bu değeri gerçek backend URL'iniz ile değiştirin:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+NEXT_PUBLIC_API_URL=https://api.your-domain.com
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Backend API Gereksinimleri
 
-## Learn More
+Frontend'in çalışması için backend API'nin aşağıdaki endpoint'leri sağlaması gerekir:
 
-To learn more about Next.js, take a look at the following resources:
+1. **POST /api/verify**
+   - Sudoku çözümünü doğrular
+   - İstek gövdesi: `{ initial_board: SudokuGrid, solution: SudokuGrid }`
+   - Yanıt: `{ valid: boolean }`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. **POST /api/prove**
+   - ZKP oluşturma işlemini başlatır
+   - İstek gövdesi: `{ initial_board: SudokuGrid, solution: SudokuGrid }`
+   - Yanıt: `{ job_id: string }`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3. **GET /api/proof/:jobId**
+   - ZKP oluşturma durumunu kontrol eder
+   - Yanıt:
+     ```
+     {
+       status: 'pending' | 'processing' | 'complete' | 'failed',
+       progress: number, // 0-1 arası
+       step: string,
+       result?: {
+         hash: string,
+         proof_file: string,
+         download_url: string
+       },
+       error?: string
+     }
+     ```
 
-## Deploy on Vercel
+## Dağıtım
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Frontend Dağıtımı
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Üretim sürümünü oluşturun:
+   ```bash
+   npm run build
+   ```
+
+2. Oluşturulan sürümü başlatın:
+   ```bash
+   npm start
+   ```
+
+### Backend Dağıtımı
+
+Backend'i ayrı bir VPS'de çalıştırabilirsiniz. Backend'in dışarıdan erişilebilir olduğundan ve CORS ayarlarının frontend domain'inize izin verecek şekilde yapılandırıldığından emin olun.
+
+## Notlar
+
+- Frontend, backend'e bağlantı kuramadığında kullanıcıya uygun hata mesajları gösterecektir.
+- Backend API URL'ini değiştirmek için `.env.local` dosyasını güncelleyin ve uygulamayı yeniden başlatın.
+- Üretim ortamında, backend API'nizi HTTPS ile güvence altına almanız önerilir.
