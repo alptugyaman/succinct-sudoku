@@ -11,11 +11,13 @@ interface ProofStatusProps {
 }
 
 type ProofStatus = {
-    status: 'pending' | 'processing' | 'complete' | 'failed' | 'not_found';
+    status: 'pending' | 'processing' | 'complete' | 'completed' | 'success' | 'failed' | 'not_found';
     progress?: number;
+    message?: string;
     result?: any;
     error?: string;
-    step?: string;
+    logs?: string[];
+    originalStatus?: string;
 };
 
 export function ProofStatus({ jobId, onComplete, onError }: ProofStatusProps) {
@@ -34,9 +36,9 @@ export function ProofStatus({ jobId, onComplete, onError }: ProofStatusProps) {
 
             if (data.status === 'processing' || data.status === 'pending') {
                 setConnectionStatus('connected');
-            } else if (data.status === 'complete') {
+            } else if (data.status === 'complete' || data.status === 'completed' || data.status === 'success') {
                 setConnectionStatus('closed');
-                onComplete(data.result);
+                onComplete(data.result || data);
             } else if (data.status === 'failed' || data.status === 'not_found') {
                 setConnectionStatus('error');
                 onError(data.error || 'Unknown error occurred');
@@ -50,12 +52,19 @@ export function ProofStatus({ jobId, onComplete, onError }: ProofStatusProps) {
     }, [jobId, onComplete, onError]);
 
     const getStatusText = () => {
+        // If we have a specific message from the backend, use it
+        if (status.message) {
+            return status.message;
+        }
+
         switch (status.status) {
             case 'pending':
                 return 'Initializing proof generation...';
             case 'processing':
-                return status.step || `Generating proof... ${status.progress ? `${Math.round(status.progress * 100)}%` : ''}`;
+                return 'Generating zero-knowledge proof...';
             case 'complete':
+            case 'completed':
+            case 'success':
                 return 'Proof generation complete!';
             case 'failed':
                 return `Proof generation failed: ${status.error || 'Unknown error'}`;
@@ -102,16 +111,25 @@ export function ProofStatus({ jobId, onComplete, onError }: ProofStatusProps) {
                     {getStatusText()}
                 </p>
 
-                {status.status === 'processing' && (
+                {(status.status === 'processing' || status.status === 'pending') && (
                     <div className="w-full space-y-2">
                         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
                             <div
                                 className="bg-[#fe11c5] h-2.5 rounded-full transition-all duration-300"
-                                style={{ width: `${status.progress ? Math.round(status.progress * 100) : 0}%` }}
+                                style={{ width: `${status.progress ? Math.round(status.progress) : 0}%` }}
                             />
                         </div>
                         <p className="text-xs text-right text-gray-600 dark:text-gray-400">
-                            {status.progress ? `${Math.round(status.progress * 100)}%` : '0%'}
+                            {status.progress ? `${Math.round(status.progress)}%` : '0%'}
+                        </p>
+                    </div>
+                )}
+
+                {/* Display the latest log entry if available */}
+                {status.logs && status.logs.length > 0 && (
+                    <div className="w-full mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded-md text-xs font-mono overflow-hidden">
+                        <p className="truncate text-gray-600 dark:text-gray-400">
+                            {status.logs[status.logs.length - 1]}
                         </p>
                     </div>
                 )}
