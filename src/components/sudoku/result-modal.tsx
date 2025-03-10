@@ -117,8 +117,35 @@ export function ResultModal({
 
     // Handle proof completion
     const handleProofComplete = (result: any) => {
-        setProofResult(result);
-        setIsGeneratingProof(false);
+        console.log('Proof completed with result:', result);
+
+        // Check if the result contains proof_available flag
+        const proofAvailable = result.proof_available ||
+            (result.logs && result.logs.some((log: string) => log.includes('vk verification: true')));
+
+        // If we have logs but no proof file yet, extract information from logs
+        if (result.logs && (!result.proof_file && !result.download_url)) {
+            // Try to find proof hash or other relevant information in logs
+            const hashLog = result.logs.find((log: string) => log.includes('hash:'));
+            if (hashLog) {
+                const hashMatch = hashLog.match(/hash:\s*([a-f0-9]+)/i);
+                if (hashMatch && hashMatch[1]) {
+                    result.hash = hashMatch[1];
+                }
+            }
+        }
+
+        // Set the proof result with available information
+        setProofResult({
+            ...result,
+            proof_available: proofAvailable
+        });
+
+        // Only hide the generating UI if we have a complete proof or an explicit error
+        if (result.proof_file || result.download_url || result.error) {
+            setIsGeneratingProof(false);
+        }
+
         setProofStep('');
     };
 
@@ -210,17 +237,30 @@ export function ResultModal({
                                 </p>
                             </div>
 
-                            {proofResult.proof_file && (
+                            {(proofResult.proof_file || proofResult.download_url || proofResult.proof_available) && (
                                 <div className="mt-4">
                                     <p className="text-sm font-semibold mb-2">Proof File:</p>
                                     <div className="bg-white dark:bg-gray-900 p-2 rounded border border-gray-300 dark:border-gray-700 mb-3">
-                                        <p className="text-xs font-mono break-all">{getProofFilename()}</p>
+                                        <p className="text-xs font-mono break-all">
+                                            {proofResult.proof_file ? getProofFilename() : 'Zero-Knowledge Proof'}
+                                        </p>
                                     </div>
                                     <Link
-                                        href={proofResult.download_url || proofResult.proof_file}
+                                        href={proofResult.download_url || proofResult.proof_file || '#'}
                                         target="_blank"
                                         download
-                                        className="flex items-center justify-center gap-2 px-4 py-2 bg-[#fe11c5] hover:bg-[#fe11c5]/80 text-white font-medium border-2 border-gray-800 dark:border-gray-600 transition-colors"
+                                        className={cn(
+                                            "flex items-center justify-center gap-2 px-4 py-2 bg-[#fe11c5] text-white font-medium border-2 border-gray-800 dark:border-gray-600 transition-colors",
+                                            (proofResult.proof_file || proofResult.download_url)
+                                                ? "hover:bg-[#fe11c5]/80"
+                                                : "opacity-70 cursor-not-allowed"
+                                        )}
+                                        onClick={(e) => {
+                                            if (!proofResult.proof_file && !proofResult.download_url) {
+                                                e.preventDefault();
+                                                alert('Proof file is being generated. Please wait a moment and try again.');
+                                            }
+                                        }}
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -228,7 +268,9 @@ export function ResultModal({
                                         Download Proof
                                     </Link>
                                     <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-                                        This file contains a cryptographic proof that you solved the Sudoku puzzle correctly.
+                                        {proofResult.proof_file || proofResult.download_url
+                                            ? "This file contains a cryptographic proof that you solved the Sudoku puzzle correctly."
+                                            : "Your proof is being prepared for download. It will be available shortly."}
                                     </p>
                                 </div>
                             )}

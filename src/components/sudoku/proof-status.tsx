@@ -18,38 +18,49 @@ type ProofStatus = {
     error?: string;
     logs?: string[];
     originalStatus?: string;
+    proof_available?: boolean;
 };
 
 export function ProofStatus({ jobId, onComplete, onError }: ProofStatusProps) {
     const [status, setStatus] = useState<ProofStatus>({ status: 'pending' });
     const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'closed' | 'error'>('connecting');
+    const [isChecking, setIsChecking] = useState(false);
 
-    useEffect(() => {
+    // Function to check the proof status
+    const checkProofStatus = async () => {
         if (!jobId) return;
 
+        setIsChecking(true);
         setConnectionStatus('connecting');
 
-        // Start tracking the proof status
-        const tracker = trackProofStatus(jobId, (data) => {
-            console.log('Proof status update:', data);
-            setStatus(data);
+        try {
+            // Call the trackProofStatus function which now makes a single request
+            await trackProofStatus(jobId, (data) => {
+                console.log('Proof status update:', data);
+                setStatus(data);
 
-            if (data.status === 'processing' || data.status === 'pending') {
-                setConnectionStatus('connected');
-            } else if (data.status === 'complete' || data.status === 'completed' || data.status === 'success') {
-                setConnectionStatus('closed');
-                onComplete(data.result || data);
-            } else if (data.status === 'failed' || data.status === 'not_found') {
-                setConnectionStatus('error');
-                onError(data.error || 'Unknown error occurred');
-            }
-        });
+                if (data.status === 'processing' || data.status === 'pending') {
+                    setConnectionStatus('connected');
+                } else if (data.status === 'complete' || data.status === 'completed' || data.status === 'success') {
+                    setConnectionStatus('closed');
+                    onComplete(data.result || data);
+                } else if (data.status === 'failed' || data.status === 'not_found') {
+                    setConnectionStatus('error');
+                    onError(data.error || 'Unknown error occurred');
+                }
+            });
+        } catch (error) {
+            console.error('Error checking proof status:', error);
+            setConnectionStatus('error');
+        } finally {
+            setIsChecking(false);
+        }
+    };
 
-        // Cleanup function
-        return () => {
-            tracker.close();
-        };
-    }, [jobId, onComplete, onError]);
+    // Check status once when component mounts
+    useEffect(() => {
+        checkProofStatus();
+    }, [jobId]);
 
     const getStatusText = () => {
         // If we have a specific message from the backend, use it
@@ -122,6 +133,60 @@ export function ProofStatus({ jobId, onComplete, onError }: ProofStatusProps) {
                         <p className="text-xs text-right text-gray-600 dark:text-gray-400">
                             {status.progress ? `${Math.round(status.progress)}%` : '0%'}
                         </p>
+                    </div>
+                )}
+
+                {/* Check Status Button */}
+                {(status.status === 'processing' || status.status === 'pending') && (
+                    <button
+                        onClick={checkProofStatus}
+                        disabled={isChecking}
+                        className={cn(
+                            "mt-2 px-4 py-2 rounded-md text-sm font-medium",
+                            "bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600",
+                            "focus:outline-none focus:ring-2 focus:ring-[#fe11c5] focus:ring-opacity-50",
+                            "transition-colors",
+                            isChecking && "opacity-50 cursor-not-allowed"
+                        )}
+                    >
+                        {isChecking ? (
+                            <span className="flex items-center gap-2">
+                                <svg className="animate-spin h-4 w-4 text-gray-600 dark:text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Checking...
+                            </span>
+                        ) : (
+                            "Check Status"
+                        )}
+                    </button>
+                )}
+
+                {/* Display download button when proof is available */}
+                {(status.status === 'completed' || status.status === 'success' || status.proof_available) && status.result && (
+                    <div className="w-full mt-4">
+                        <a
+                            href={status.result.proof_file || status.result.proof_url || '#'}
+                            download
+                            className={cn(
+                                "w-full flex items-center justify-center gap-2 px-4 py-2 rounded-md",
+                                "bg-[#fe11c5] hover:bg-[#d10ea6] text-white font-medium transition-colors",
+                                "focus:outline-none focus:ring-2 focus:ring-[#fe11c5] focus:ring-opacity-50",
+                                (!status.result.proof_file && !status.result.proof_url) && "opacity-50 cursor-not-allowed"
+                            )}
+                            onClick={(e) => {
+                                if (!status.result.proof_file && !status.result.proof_url) {
+                                    e.preventDefault();
+                                    alert('Proof file is not available for download');
+                                }
+                            }}
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                            Download Proof
+                        </a>
                     </div>
                 )}
 
