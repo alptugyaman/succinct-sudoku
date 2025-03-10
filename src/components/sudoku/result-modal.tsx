@@ -228,55 +228,10 @@ export function ResultModal({
 
                 {proofResult && (
                     <div className="mt-2 p-4 bg-gray-100 dark:bg-gray-800 rounded-md">
-                        <h3 className="text-lg font-semibold mb-2 text-[#fe11c5]">Proof Generated Successfully!</h3>
+                        <h3 className="text-lg font-semibold mb-2 text-[#fe11c5]">Proof Generation Completed!</h3>
                         <div className="space-y-3">
-                            <div>
-                                <p className="text-sm font-semibold">Proof Hash:</p>
-                                <p className="text-xs bg-white dark:bg-gray-900 p-2 rounded border border-gray-300 dark:border-gray-700 break-all font-mono">
-                                    {proofResult.hash || 'N/A'}
-                                </p>
-                            </div>
-
-                            {(proofResult.proof_file || proofResult.download_url || proofResult.proof_available) && (
-                                <div className="mt-4">
-                                    <p className="text-sm font-semibold mb-2">Proof File:</p>
-                                    <div className="bg-white dark:bg-gray-900 p-2 rounded border border-gray-300 dark:border-gray-700 mb-3">
-                                        <p className="text-xs font-mono break-all">
-                                            {proofResult.proof_file ? getProofFilename() : 'Zero-Knowledge Proof'}
-                                        </p>
-                                    </div>
-                                    <Link
-                                        href={proofResult.download_url || proofResult.proof_file || '#'}
-                                        target="_blank"
-                                        download
-                                        className={cn(
-                                            "flex items-center justify-center gap-2 px-4 py-2 bg-[#fe11c5] text-white font-medium border-2 border-gray-800 dark:border-gray-600 transition-colors",
-                                            (proofResult.proof_file || proofResult.download_url)
-                                                ? "hover:bg-[#fe11c5]/80"
-                                                : "opacity-70 cursor-not-allowed"
-                                        )}
-                                        onClick={(e) => {
-                                            if (!proofResult.proof_file && !proofResult.download_url) {
-                                                e.preventDefault();
-                                                alert('Proof file is being generated. Please wait a moment and try again.');
-                                            }
-                                        }}
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                        </svg>
-                                        Download Proof
-                                    </Link>
-                                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-                                        {proofResult.proof_file || proofResult.download_url
-                                            ? "This file contains a cryptographic proof that you solved the Sudoku puzzle correctly."
-                                            : "Your proof is being prepared for download. It will be available shortly."}
-                                    </p>
-                                </div>
-                            )}
-
                             <p className="text-sm text-gray-600 dark:text-gray-400">
-                                You can share this proof with others to verify that you solved the puzzle without revealing your solution.
+                                You have successfully generated a zero-knowledge proof that you solved the Sudoku puzzle without revealing your solution.
                             </p>
                         </div>
                     </div>

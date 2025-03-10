@@ -54,7 +54,7 @@ export function ProofButton({
             console.log('🆔 [ProofButton] Received job ID:', jobId);
 
             // Track the proof status
-            const statusTracker = trackProofStatus(jobId, (status) => {
+            const statusTracker = await trackProofStatus(jobId, (status) => {
                 console.log('📊 [ProofButton] Received status update:', status);
                 if (status.status === "processing" || status.status === "pending") {
                     setProgress(status.progress || 0);
@@ -79,7 +79,10 @@ export function ProofButton({
                 }
             });
 
-            setTracker(statusTracker);
+            // Now statusTracker is the resolved value, not a Promise
+            if (statusTracker) {
+                setTracker(statusTracker);
+            }
         } catch (error) {
             console.error('❌ [ProofButton] Error in proof generation process:', error);
             setIsGenerating(false);

@@ -1,8 +1,8 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { useEffect, useState } from 'react';
-import { trackProofStatus } from '@/lib/api';
+import { useEffect, useState, useRef } from 'react';
+import { trackProofStatus, connectToLogStream } from '@/lib/api';
 
 interface ProofStatusProps {
     jobId: string | null;
@@ -25,6 +25,12 @@ export function ProofStatus({ jobId, onComplete, onError }: ProofStatusProps) {
     const [status, setStatus] = useState<ProofStatus>({ status: 'pending' });
     const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'closed' | 'error'>('connecting');
     const [isChecking, setIsChecking] = useState(false);
+    const [liveLogs, setLiveLogs] = useState<string[]>([]);
+    const [isStreamingLogs, setIsStreamingLogs] = useState(false);
+    const logStreamRef = useRef<{ close: () => void, isConnected: () => boolean } | null>(null);
+    const logsEndRef = useRef<HTMLDivElement>(null);
+    // Set to track unique log messages
+    const seenLogsRef = useRef<Set<string>>(new Set());
 
     // Function to check the proof status
     const checkProofStatus = async () => {
@@ -41,6 +47,11 @@ export function ProofStatus({ jobId, onComplete, onError }: ProofStatusProps) {
 
                 if (data.status === 'processing' || data.status === 'pending') {
                     setConnectionStatus('connected');
+
+                    // If we got a 200 response and we're not already streaming logs, start streaming
+                    if (!isStreamingLogs) {
+                        startLogStream();
+                    }
                 } else if (data.status === 'complete' || data.status === 'completed' || data.status === 'success') {
                     setConnectionStatus('closed');
                     onComplete(data.result || data);
@@ -57,10 +68,149 @@ export function ProofStatus({ jobId, onComplete, onError }: ProofStatusProps) {
         }
     };
 
+    // Function to start streaming logs
+    const startLogStream = () => {
+        if (!jobId || isStreamingLogs) return;
+
+        try {
+            // Reset seen logs when starting a new stream
+            seenLogsRef.current = new Set();
+
+            // Close existing connection if any
+            if (logStreamRef.current) {
+                logStreamRef.current.close();
+            }
+
+            // Connect to log stream
+            logStreamRef.current = connectToLogStream(
+                jobId,
+                (log) => {
+                    // Process the log line
+                    // Remove any ANSI color codes or special characters
+                    const cleanLog = log.replace(/\u001b\[\d+m/g, '').trim();
+
+                    if (cleanLog) {
+                        // Check if we've already seen this exact log message
+                        if (!seenLogsRef.current.has(cleanLog)) {
+                            // Add to seen logs set
+                            seenLogsRef.current.add(cleanLog);
+
+                            // Update the live logs state
+                            setLiveLogs(prev => {
+                                // Limit the number of logs to prevent memory issues
+                                const newLogs = [...prev, cleanLog];
+                                if (newLogs.length > 100) {
+                                    return newLogs.slice(-100); // Keep only the last 100 logs
+                                }
+                                return newLogs;
+                            });
+
+                            // Scroll to bottom of logs
+                            if (logsEndRef.current) {
+                                logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+                            }
+
+                            // Check for important log messages and update progress
+                            if (cleanLog.includes('Proof successfully generated') ||
+                                cleanLog.includes('Proof generation completed') ||
+                                cleanLog.includes('Job status updated to \'Complete\'')) {
+                                // Update status to show proof is ready
+                                setStatus(prev => ({
+                                    ...prev,
+                                    status: 'completed',
+                                    progress: 100,
+                                    message: 'Proof generation completed!',
+                                    proof_available: true
+                                }));
+
+                                // Notify parent component
+                                onComplete({
+                                    status: 'completed',
+                                    progress: 100,
+                                    message: 'Proof generation completed!',
+                                    proof_available: true
+                                });
+                            }
+                            // Update progress based on log messages
+                            else if (cleanLog.includes('generate_proof started')) {
+                                setStatus(prev => ({ ...prev, progress: 10 }));
+                            }
+                            else if (cleanLog.includes('Validating solution')) {
+                                setStatus(prev => ({ ...prev, progress: 20 }));
+                            }
+                            else if (cleanLog.includes('Creating ProverClient')) {
+                                setStatus(prev => ({ ...prev, progress: 30 }));
+                            }
+                            else if (cleanLog.includes('Preparing SP1 inputs')) {
+                                setStatus(prev => ({ ...prev, progress: 40 }));
+                            }
+                            else if (cleanLog.includes('Running SP1 program')) {
+                                setStatus(prev => ({ ...prev, progress: 50 }));
+                            }
+                            else if (cleanLog.includes('SP1 execution result')) {
+                                setStatus(prev => ({ ...prev, progress: 60 }));
+                            }
+                            else if (cleanLog.includes('Setting up prover')) {
+                                setStatus(prev => ({ ...prev, progress: 70 }));
+                            }
+                            else if (cleanLog.includes('Verification key')) {
+                                setStatus(prev => ({ ...prev, progress: 80 }));
+                            }
+                            else if (cleanLog.includes('Proof successfully generated')) {
+                                setStatus(prev => ({ ...prev, progress: 90 }));
+                            }
+                            else if (cleanLog.includes('Proof generation process completed')) {
+                                setStatus(prev => ({ ...prev, progress: 95 }));
+                            }
+                        } else {
+                            console.log('🔄 [Client] Skipping duplicate log:', cleanLog);
+                        }
+                    }
+                },
+                (error) => {
+                    console.error('Log stream error:', error);
+
+                    // WebSocket hatası durumunda, kullanıcıya bilgi verme
+                    // Sadece bağlantı durumunu güncelle
+                    setConnectionStatus('error');
+
+                    // Hata mesajını loglara ekleme
+                    // Kullanıcıya gösterme
+
+                    // Hata durumunda işlemin tamamlandığını bildirme
+                }
+            );
+
+            setIsStreamingLogs(true);
+        } catch (error: unknown) {
+            console.error('Error starting log stream:', error);
+            setConnectionStatus('error');
+
+            // Hata durumunda bile kullanıcıya bilgi ver
+            setLiveLogs(prev => [...prev, `Error connecting to log stream: ${error instanceof Error ? error.message : 'Unknown error'}`]);
+        }
+    };
+
+    // Cleanup function for WebSocket connection
+    useEffect(() => {
+        return () => {
+            if (logStreamRef.current) {
+                logStreamRef.current.close();
+            }
+        };
+    }, []);
+
     // Check status once when component mounts
     useEffect(() => {
         checkProofStatus();
     }, [jobId]);
+
+    // Scroll to bottom when new logs arrive
+    useEffect(() => {
+        if (logsEndRef.current) {
+            logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [liveLogs]);
 
     const getStatusText = () => {
         // If we have a specific message from the backend, use it
@@ -104,20 +254,6 @@ export function ProofStatus({ jobId, onComplete, onError }: ProofStatusProps) {
     return (
         <div className="w-full">
             <div className="flex flex-col gap-3 items-center">
-                <div className="flex items-center gap-2 w-full">
-                    <div
-                        className={cn(
-                            "w-3 h-3 rounded-full",
-                            connectionStatus === 'connected' ? "bg-green-500" :
-                                connectionStatus === 'connecting' ? "bg-yellow-500" :
-                                    connectionStatus === 'error' ? "bg-red-500" : "bg-gray-500"
-                        )}
-                    />
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {getConnectionStatusText()}
-                    </p>
-                </div>
-
                 <p className="text-center font-medium">
                     {getStatusText()}
                 </p>
@@ -136,66 +272,74 @@ export function ProofStatus({ jobId, onComplete, onError }: ProofStatusProps) {
                     </div>
                 )}
 
-                {/* Check Status Button */}
-                {(status.status === 'processing' || status.status === 'pending') && (
-                    <button
-                        onClick={checkProofStatus}
-                        disabled={isChecking}
-                        className={cn(
-                            "mt-2 px-4 py-2 rounded-md text-sm font-medium",
-                            "bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600",
-                            "focus:outline-none focus:ring-2 focus:ring-[#fe11c5] focus:ring-opacity-50",
-                            "transition-colors",
-                            isChecking && "opacity-50 cursor-not-allowed"
-                        )}
-                    >
-                        {isChecking ? (
-                            <span className="flex items-center gap-2">
-                                <svg className="animate-spin h-4 w-4 text-gray-600 dark:text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                Checking...
-                            </span>
-                        ) : (
-                            "Check Status"
-                        )}
-                    </button>
-                )}
-
-                {/* Display download button when proof is available */}
-                {(status.status === 'completed' || status.status === 'success' || status.proof_available) && status.result && (
+                {/* Live Logs Section */}
+                {isStreamingLogs && (
                     <div className="w-full mt-4">
-                        <a
-                            href={status.result.proof_file || status.result.proof_url || '#'}
-                            download
-                            className={cn(
-                                "w-full flex items-center justify-center gap-2 px-4 py-2 rounded-md",
-                                "bg-[#fe11c5] hover:bg-[#d10ea6] text-white font-medium transition-colors",
-                                "focus:outline-none focus:ring-2 focus:ring-[#fe11c5] focus:ring-opacity-50",
-                                (!status.result.proof_file && !status.result.proof_url) && "opacity-50 cursor-not-allowed"
-                            )}
-                            onClick={(e) => {
-                                if (!status.result.proof_file && !status.result.proof_url) {
-                                    e.preventDefault();
-                                    alert('Proof file is not available for download');
-                                }
-                            }}
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-                            </svg>
-                            Download Proof
-                        </a>
-                    </div>
-                )}
+                        <div className="flex justify-between items-center mb-2">
+                            <h4 className="text-sm font-semibold">Live Logs:</h4>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-500">
+                                    {liveLogs.length} log entries
+                                </span>
+                                <button
+                                    onClick={() => setLiveLogs([])}
+                                    className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded"
+                                    title="Clear logs"
+                                >
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+                        <div className="w-full h-48 bg-black text-green-400 p-2 rounded-md font-mono text-xs overflow-y-auto">
+                            {liveLogs.length > 0 ? (
+                                liveLogs.map((log, index) => {
+                                    // Bağlantı hatası mesajlarını gösterme
+                                    if (log.includes('Connection error')) {
+                                        return null;
+                                    }
 
-                {/* Display the latest log entry if available */}
-                {status.logs && status.logs.length > 0 && (
-                    <div className="w-full mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded-md text-xs font-mono overflow-hidden">
-                        <p className="truncate text-gray-600 dark:text-gray-400">
-                            {status.logs[status.logs.length - 1]}
-                        </p>
+                                    // Highlight important log messages
+                                    const isError = log.toLowerCase().includes('error') && !log.includes('Connection error');
+                                    const isWarning = log.toLowerCase().includes('warning');
+                                    const isSuccess = log.includes('vk verification: true') ||
+                                        log.includes('Proof successfully generated');
+                                    const isJobId = log.includes(jobId || '');
+
+                                    // Extract the log type/prefix if available
+                                    let logPrefix = '';
+                                    let logContent = log;
+
+                                    if (log.includes(':')) {
+                                        const parts = log.split(':', 2);
+                                        if (parts.length === 2) {
+                                            logPrefix = parts[0].trim();
+                                            logContent = parts[1].trim();
+                                        }
+                                    }
+
+                                    return (
+                                        <div
+                                            key={index}
+                                            className={cn(
+                                                "whitespace-pre-wrap break-all py-0.5",
+                                                isError && "text-red-400",
+                                                isWarning && "text-yellow-400",
+                                                isSuccess && "text-green-500 font-bold",
+                                                isJobId && "opacity-70"
+                                            )}
+                                        >
+                                            {logPrefix && (
+                                                <span className="text-blue-400 mr-1">{logPrefix}:</span>
+                                            )}
+                                            {logContent}
+                                        </div>
+                                    );
+                                }).filter(Boolean) // null değerleri filtrele
+                            ) : (
+                                <div className="text-gray-500">Waiting for logs...</div>
+                            )}
+                            <div ref={logsEndRef} />
+                        </div>
                     </div>
                 )}
 
