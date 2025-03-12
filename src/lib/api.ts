@@ -131,7 +131,7 @@ export async function trackProofStatus(jobId: string, onStatusChange: (status: a
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 seconds timeout
 
         // Make a single request to check the proof status
-        const response = await fetch(`${API_BASE_URL}/api/proof-status/${jobId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/proof/${jobId}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -245,7 +245,7 @@ export function connectToLogStream(jobId: string, onLogReceived: (log: string) =
         const apiUrl = new URL(API_BASE_URL);
         // Determine WebSocket protocol (ws or wss)
         const wsProtocol = apiUrl.protocol === 'https:' ? 'wss:' : 'ws:';
-        // Construct WebSocket URL
+        // Construct WebSocket URL - bu URL doğru, değişiklik yapmaya gerek yok
         wsUrl = `${wsProtocol}//${apiUrl.host}/api/logs/${jobId}`;
     } catch (error) {
         // Fallback to default if URL parsing fails
