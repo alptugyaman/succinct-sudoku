@@ -2,10 +2,9 @@
 
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
-import { generateProof, verifySudoku } from '@/lib/api';
 import { SudokuGrid } from '@/lib/sudoku';
+import { generateProof } from '@/lib/api';
 import { ProofStatus } from './proof-status';
-import Link from 'next/link';
 
 interface ResultModalProps {
     isCorrect: boolean;
@@ -30,13 +29,6 @@ export function ResultModal({
     const [proofResult, setProofResult] = useState<any>(null);
     const [proofError, setProofError] = useState<string | null>(null);
     const [proofStep, setProofStep] = useState<string>('');
-
-    // Extract filename from proof file path
-    const getProofFilename = () => {
-        if (!proofResult?.proof_file) return '';
-        const parts = proofResult.proof_file.split('/');
-        return parts[parts.length - 1];
-    };
 
     // Format the time as mm:ss
     const formatTime = (seconds: number) => {
@@ -91,69 +83,40 @@ export function ResultModal({
             setIsGeneratingProof(true);
             setProofError(null);
             setProofResult(null);
-            setProofStep('Verifying solution...');
-
-            // First verify the solution on the server
-            const verificationResult = await verifySudoku(originalGrid, currentGrid);
-
-            if (!verificationResult.valid) {
-                setProofError('Solution verification failed. Please try again.');
-                setIsGeneratingProof(false);
-                return;
-            }
-
             setProofStep('Initiating proof generation...');
 
-            // Generate the proof
+            // Generate the proof by calling the /api/prove endpoint
             const jobId = await generateProof(originalGrid, currentGrid);
+
+            if (!jobId) {
+                throw new Error('Failed to get a valid job ID from the server');
+            }
+
+            // Add a 5-second delay before setting up WebSocket connection
+            setProofStep('Proof generation started. Waiting for server processing...');
+
+            // Wait for 5 seconds
+            await new Promise(resolve => setTimeout(resolve, 5000));
+
+            // Now set the job ID to start tracking with WebSocket
             setProofJobId(jobId);
-            setProofStep('Proof generation started. Connecting to server...');
+            setProofStep('Connecting to server for proof status...');
         } catch (error) {
-            console.error('Error starting proof generation:', error);
-            setProofError('Failed to start proof generation. Please try again.');
+            setProofError(error instanceof Error ? error.message : 'Failed to start proof generation. Please try again.');
             setIsGeneratingProof(false);
         }
     };
 
     // Handle proof completion
     const handleProofComplete = (result: any) => {
-        console.log('Proof completed with result:', result);
-
-        // Check if the result contains proof_available flag
-        const proofAvailable = result.proof_available ||
-            (result.logs && result.logs.some((log: string) => log.includes('vk verification: true')));
-
-        // If we have logs but no proof file yet, extract information from logs
-        if (result.logs && (!result.proof_file && !result.download_url)) {
-            // Try to find proof hash or other relevant information in logs
-            const hashLog = result.logs.find((log: string) => log.includes('hash:'));
-            if (hashLog) {
-                const hashMatch = hashLog.match(/hash:\s*([a-f0-9]+)/i);
-                if (hashMatch && hashMatch[1]) {
-                    result.hash = hashMatch[1];
-                }
-            }
-        }
-
-        // Set the proof result with available information
-        setProofResult({
-            ...result,
-            proof_available: proofAvailable
-        });
-
-        // Only hide the generating UI if we have a complete proof or an explicit error
-        if (result.proof_file || result.download_url || result.error) {
-            setIsGeneratingProof(false);
-        }
-
-        setProofStep('');
+        setProofResult(result);
+        setIsGeneratingProof(false);
     };
 
     // Handle proof error
     const handleProofError = (error: string) => {
         setProofError(error);
         setIsGeneratingProof(false);
-        setProofStep('');
     };
 
     useEffect(() => {
@@ -233,6 +196,14 @@ export function ResultModal({
                             <p className="text-sm text-gray-600 dark:text-gray-400">
                                 You have successfully generated a zero-knowledge proof that you solved the Sudoku puzzle without revealing your solution.
                             </p>
+                            <p className="text-sm font-medium">
+                                The proof has been verified and recorded. Your achievement is now cryptographically proven!
+                            </p>
+                            {proofResult.hash && (
+                                <div className="text-xs bg-gray-200 dark:bg-gray-700 p-2 rounded font-mono overflow-x-auto">
+                                    <span className="font-semibold">Proof Hash:</span> {proofResult.hash}
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
