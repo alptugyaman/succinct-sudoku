@@ -1,95 +1,215 @@
-# Sudoku ZKP (Zero-Knowledge Proof) Uygulaması
+# Succinct Sudoku
 
-Bu uygulama, Sudoku çözümlerini doğrulayan ve Zero-Knowledge Proof (ZKP) oluşturan bir web uygulamasıdır. Frontend Next.js ile geliştirilmiştir ve harici bir backend API'ye bağlanır.
+A modern, interactive Sudoku game built with Next.js, TypeScript, and Tailwind CSS. This project implements a clean, responsive Sudoku game with a focus on user experience and performance.
 
-## Proje Yapısı
+## Features
 
-- `src/`: Kaynak kodları
-  - `app/`: Next.js uygulama dosyaları
-  - `components/`: React bileşenleri
-  - `lib/`: Yardımcı fonksiyonlar ve API servisleri
+- 🎮 Interactive Sudoku board with number pad
+- 🎯 Multiple difficulty levels
+- ⏱️ Timer functionality
+- 🎨 Modern, responsive UI with dark mode support
+- 🔄 Game controls for new game, undo, and hints
+- 📱 Mobile-first design
+- ⚡ Fast performance with Next.js and React Server Components
+- 🔐 Zero-Knowledge Proof generation for solution verification
 
-## Kurulum
+## Tech Stack
 
-### Frontend (Next.js)
+- **Framework**: Next.js 15.2.1
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **State Management**: Zustand
+- **UI Components**: Radix UI
+- **Form Validation**: Zod
+- **HTTP Client**: Axios
 
-1. Bağımlılıkları yükleyin:
-   ```bash
-   npm install
-   ```
+## Prerequisites
 
-2. Geliştirme sunucusunu başlatın:
-   ```bash
-   npm run dev
-   ```
+- Node.js 18.x or later
+- npm or yarn package manager
 
-3. Uygulamaya tarayıcıdan erişin: `http://localhost:3000`
+## Getting Started
 
-### Backend Yapılandırması
-
-Frontend, harici bir backend API'ye bağlanacak şekilde yapılandırılmıştır. Backend URL'ini `.env.local` dosyasında ayarlayabilirsiniz:
-
-```
-NEXT_PUBLIC_API_URL=http://localhost:5000
-```
-
-Üretim ortamında, bu değeri gerçek backend URL'iniz ile değiştirin:
-
-```
-NEXT_PUBLIC_API_URL=https://api.your-domain.com
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/sudoku.git
+cd sudoku
 ```
 
-## Backend API Gereksinimleri
+2. Install dependencies:
+```bash
+npm install
+# or
+yarn install
+```
 
-Frontend'in çalışması için backend API'nin aşağıdaki endpoint'leri sağlaması gerekir:
+3. Create a `.env.local` file in the root directory and add any required environment variables:
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3000
+```
 
-1. **POST /api/verify**
-   - Sudoku çözümünü doğrular
-   - İstek gövdesi: `{ initial_board: SudokuGrid, solution: SudokuGrid }`
-   - Yanıt: `{ valid: boolean }`
+4. Run the development server:
+```bash
+npm run dev
+# or
+yarn dev
+```
 
-2. **POST /api/prove**
-   - ZKP oluşturma işlemini başlatır
-   - İstek gövdesi: `{ initial_board: SudokuGrid, solution: SudokuGrid }`
-   - Yanıt: `{ job_id: string }`
+5. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
 
-3. **GET /api/proof/:jobId**
-   - ZKP oluşturma durumunu kontrol eder
-   - Yanıt:
-     ```
-     {
-       status: 'pending' | 'processing' | 'complete' | 'failed',
-       progress: number, // 0-1 arası
-       step: string,
-       result?: {
-         hash: string,
-         proof_file: string,
-         download_url: string
-       },
-       error?: string
-     }
-     ```
+## Project Structure
 
-## Dağıtım
+```
+src/
+├── app/                    # Next.js app directory
+│   ├── api/               # API routes
+│   │   ├── prove/        # ZKP proof generation endpoint
+│   │   └── status/       # Proof status checking endpoint
+│   ├── layout.tsx         # Root layout
+│   └── page.tsx           # Home page
+├── components/            # React components
+│   ├── sudoku/           # Sudoku game components
+│   │   ├── board.tsx     # Sudoku board component
+│   │   ├── game.tsx      # Main game component
+│   │   ├── game-controls.tsx
+│   │   ├── game-status.tsx
+│   │   ├── number-pad.tsx
+│   │   ├── proof-status.tsx
+│   │   ├── result-modal.tsx
+│   │   └── start-screen.tsx
+│   └── ui/               # Reusable UI components
+└── lib/                  # Utility functions and core logic
+    ├── api.ts           # API integration
+    ├── sudoku.ts        # Sudoku game logic
+    ├── store.ts         # Zustand store
+    └── utils.ts         # Utility functions
+```
 
-### Frontend Dağıtımı
+## Technical Implementation
 
-1. Üretim sürümünü oluşturun:
-   ```bash
-   npm run build
+### Game Logic (`lib/sudoku.ts`)
+- Implements core Sudoku algorithms:
+  - `createSolvedGrid()`: Generates a valid solved Sudoku grid
+  - `solveSudoku(grid)`: Solves a Sudoku grid using backtracking
+  - `isValidPlacement(grid, row, col, num)`: Validates number placement
+  - `isValidSolution(grid)`: Verifies complete solution validity
+
+### API Integration (`lib/api.ts`)
+The application communicates with a backend API for ZKP generation:
+
+1. **Generate Proof**
+   ```typescript
+   POST /api/prove
+   Body: {
+     initial_board: number[][],
+     solution: number[][]
+   }
+   Response: { job_id: string }
    ```
 
-2. Oluşturulan sürümü başlatın:
-   ```bash
-   npm start
+2. **Check Proof Status**
+   ```typescript
+   GET /api/status/:jobId
+   Response: {
+     status: 'pending' | 'processing' | 'complete' | 'failed',
+     progress: number,
+     message: string,
+     result: object | null
+   }
    ```
 
-### Backend Dağıtımı
+### Component Architecture
 
-Backend'i ayrı bir VPS'de çalıştırabilirsiniz. Backend'in dışarıdan erişilebilir olduğundan ve CORS ayarlarının frontend domain'inize izin verecek şekilde yapılandırıldığından emin olun.
+1. **Game Component (`components/sudoku/game.tsx`)**
+   - Main game container
+   - Manages game state and user interactions
+   - Coordinates between board, controls, and number pad
 
-## Notlar
+2. **Board Component (`components/sudoku/board.tsx`)**
+   - Renders the 9x9 Sudoku grid
+   - Handles cell selection and highlighting
+   - Manages visual feedback for valid/invalid moves
 
-- Frontend, backend'e bağlantı kuramadığında kullanıcıya uygun hata mesajları gösterecektir.
-- Backend API URL'ini değiştirmek için `.env.local` dosyasını güncelleyin ve uygulamayı yeniden başlatın.
-- Üretim ortamında, backend API'nizi HTTPS ile güvence altına almanız önerilir.
+3. **Game Controls (`components/sudoku/game-controls.tsx`)**
+   - Provides game management options:
+     - New game
+     - Undo move
+     - Get hint
+     - Pause/resume
+
+4. **Number Pad (`components/sudoku/number-pad.tsx`)**
+   - Input interface for numbers 1-9
+   - Highlights available numbers
+   - Handles number selection
+
+5. **Proof Status (`components/sudoku/proof-status.tsx`)**
+   - Displays ZKP generation progress
+   - Shows proof status and result
+   - Handles error states
+
+### State Management
+- Uses Zustand for global state management
+- Stores:
+  - Current game board
+  - Game status (active/paused)
+  - Timer state
+  - Move history
+  - Proof generation status
+
+## Game Features
+
+### Board
+- Interactive 9x9 grid
+- Cell highlighting for selected numbers
+- Visual feedback for valid/invalid moves
+- Responsive design that works on all screen sizes
+
+### Controls
+- Number pad (1-9) for input
+- Game controls for:
+  - Starting new games
+  - Undoing moves
+  - Getting hints
+  - Pausing/resuming the game
+
+### Game Logic
+- Validates moves according to Sudoku rules
+- Tracks game progress
+- Provides difficulty levels
+- Timer functionality
+
+## Development
+
+### Available Scripts
+
+- `npm run dev` - Start development server with Turbopack
+- `npm run build` - Build the application
+- `npm run start` - Start the production server
+- `npm run lint` - Run ESLint
+
+### Code Style
+
+- Follow TypeScript best practices
+- Use functional components with hooks
+- Implement proper error handling
+- Write clean, maintainable code
+- Use proper TypeScript types and interfaces
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Built with Next.js and React
+- Styled with Tailwind CSS
+- UI components from Radix UI
+- State management with Zustand
