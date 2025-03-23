@@ -63,8 +63,7 @@ yarn dev
 src/
 ├── app/                    # Next.js app directory
 │   ├── api/               # API routes
-│   │   ├── prove/        # ZKP proof generation endpoint
-│   │   └── status/       # Proof status checking endpoint
+│   │   └── validate-sudoku/ # Sudoku validation endpoint
 │   ├── layout.tsx         # Root layout
 │   └── page.tsx           # Home page
 ├── components/            # React components
@@ -95,28 +94,16 @@ src/
   - `isValidSolution(grid)`: Verifies complete solution validity
 
 ### API Integration (`lib/api.ts`)
-The application communicates with a backend API for ZKP generation:
+The application communicates with a backend API for Sudoku validation:
 
-1. **Generate Proof**
-   ```typescript
-   POST /api/prove
-   Body: {
-     initial_board: number[][],
-     solution: number[][]
-   }
-   Response: { job_id: string }
-   ```
-
-2. **Check Proof Status**
-   ```typescript
-   GET /api/status/:jobId
-   Response: {
-     status: 'pending' | 'processing' | 'complete' | 'failed',
-     progress: number,
-     message: string,
-     result: object | null
-   }
-   ```
+```typescript
+POST /validate-sudoku
+Body: {
+  board: number[][],
+  solution: number[][]
+}
+Response: { job_id: string }
+```
 
 ### Component Architecture
 

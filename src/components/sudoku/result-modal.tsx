@@ -4,7 +4,6 @@ import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { SudokuGrid } from '@/lib/sudoku';
 import { generateProof } from '@/lib/api';
-import { ProofStatus } from './proof-status';
 
 interface ResultModalProps {
     isCorrect: boolean;
@@ -25,10 +24,9 @@ export function ResultModal({
 }: ResultModalProps) {
     const [isVisible, setIsVisible] = useState(false);
     const [isGeneratingProof, setIsGeneratingProof] = useState(false);
-    const [proofJobId, setProofJobId] = useState<string | null>(null);
     const [proofResult, setProofResult] = useState<any>(null);
     const [proofError, setProofError] = useState<string | null>(null);
-    const [proofStep, setProofStep] = useState<string>('');
+    const [proofStep, setProofStep] = useState<string>('Initiating proof generation... This may take several minutes to complete.');
 
     // Format the time as mm:ss
     const formatTime = (seconds: number) => {
@@ -83,26 +81,64 @@ export function ResultModal({
             setIsGeneratingProof(true);
             setProofError(null);
             setProofResult(null);
-            setProofStep('Initiating proof generation...');
+            setProofStep('Starting ZK Proof generation process... This may take several minutes to complete.');
 
-            // Generate the proof by calling the /api/prove endpoint
-            const jobId = await generateProof(originalGrid, currentGrid);
+            console.log('Starting proof generation with original grid and current grid...');
 
-            if (!jobId) {
-                throw new Error('Failed to get a valid job ID from the server');
+            // Generate proof by calling the /validate-sudoku endpoint
+            const validationResult = await generateProof(originalGrid, currentGrid);
+
+            console.log('Proof generation result:', validationResult);
+
+            // Check if we got a valid response with proof_generated
+            if (!validationResult || validationResult.is_valid === undefined) {
+                throw new Error('Invalid response from the server');
             }
 
-            // Add a 5-second delay before setting up WebSocket connection
-            setProofStep('Proof generation started. Waiting for server processing...');
+            // If the solution is valid and proof was generated
+            if (validationResult.is_valid && validationResult.proof_generated) {
+                // Wait for visual effect and show progress messages
+                setProofStep('Proof generation successful. Processing results...');
+                await new Promise(resolve => setTimeout(resolve, 5000)); // Increased waiting time
+                setProofStep('Finalizing proof...');
+                await new Promise(resolve => setTimeout(resolve, 3000)); // Additional step
 
-            // Wait for 5 seconds
-            await new Promise(resolve => setTimeout(resolve, 5000));
+                // Complete the process directly
+                handleProofComplete({
+                    status: 'complete',
+                    message: 'Your Sudoku solution has been successfully proven with ZK Proofs!'
+                });
+            } else if (validationResult.is_valid && !validationResult.proof_generated) {
+                // Valid solution but proof generation failed
+                setProofStep('Solution is valid but proof generation failed...');
+                await new Promise(resolve => setTimeout(resolve, 5000)); // Increased waiting time
 
-            // Now set the job ID to start tracking with WebSocket
-            setProofJobId(jobId);
-            setProofStep('Connecting to server for proof status...');
+                handleProofComplete({
+                    status: 'complete',
+                    message: 'Your solution is valid, but we could not generate a ZK Proof.'
+                });
+            } else {
+                // Invalid solution
+                throw new Error('Your Sudoku solution is not valid');
+            }
         } catch (error) {
-            setProofError(error instanceof Error ? error.message : 'Failed to start proof generation. Please try again.');
+            console.error('Proof generation error:', error);
+            let errorMessage = 'Proof generation could not be started. Please try again.';
+
+            if (error instanceof Error) {
+                // Better processing of API error messages and user-friendly messages
+                if (error.message.includes('422')) {
+                    errorMessage = 'Invalid Sudoku solution. Please check your solution.';
+                } else if (error.message.includes('timed out')) {
+                    errorMessage = 'Proof generation timed out. Please check your internet connection and try again.';
+                } else if (error.message.includes('Could not connect')) {
+                    errorMessage = 'Could not connect to proof generation server. Please try again later.';
+                } else {
+                    errorMessage = error.message;
+                }
+            }
+
+            setProofError(errorMessage);
             setIsGeneratingProof(false);
         }
     };
@@ -158,9 +194,9 @@ export function ResultModal({
 
                 {isCorrect && !isGeneratingProof && !proofResult && !proofError && (
                     <div className="mt-2 p-4 bg-gray-100 dark:bg-gray-800 rounded-md">
-                        <h3 className="text-lg font-semibold mb-2">Generate Zero-Knowledge Proof</h3>
+                        <h3 className="text-lg font-semibold mb-2">Generate a Proof of Your Solution</h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                            Create a cryptographic proof that you solved this Sudoku puzzle without revealing your solution.
+                            Create a ZKP that you've correctly solved the Sudoku puzzle. The proof generation process may take several minutes to complete.
                         </p>
                         <button
                             className="w-full px-4 py-2 bg-[#fe11c5] hover:bg-[#fe11c5]/80 text-white font-medium border-2 border-gray-800 dark:border-gray-600 transition-colors"
@@ -173,37 +209,22 @@ export function ResultModal({
 
                 {isGeneratingProof && (
                     <div className="mt-2 p-4 bg-gray-100 dark:bg-gray-800 rounded-md">
-                        <h3 className="text-lg font-semibold mb-3">Generating Zero-Knowledge Proof</h3>
-                        {proofJobId ? (
-                            <ProofStatus
-                                jobId={proofJobId}
-                                onComplete={handleProofComplete}
-                                onError={handleProofError}
-                            />
-                        ) : (
-                            <div className="flex flex-col items-center gap-2">
-                                <div className="w-8 h-8 border-4 border-[#fe11c5] border-t-transparent rounded-full animate-spin"></div>
-                                <p>{proofStep}</p>
-                            </div>
-                        )}
+                        <h3 className="text-lg font-semibold mb-3">Generating Proof of Solution</h3>
+                        <div className="flex flex-col items-center gap-2">
+                            <div className="w-8 h-8 border-4 border-[#fe11c5] border-t-transparent rounded-full animate-spin"></div>
+                            <p>{proofStep}</p>
+                            <p className="text-xs text-gray-500 mt-2">This process can take up to 10 minutes. Please be patient.</p>
+                        </div>
                     </div>
                 )}
 
                 {proofResult && (
                     <div className="mt-2 p-4 bg-gray-100 dark:bg-gray-800 rounded-md">
-                        <h3 className="text-lg font-semibold mb-2 text-[#fe11c5]">Proof Generation Completed!</h3>
+                        <h3 className="text-lg font-semibold mb-2 text-[#fe11c5]">Proof Generation Complete!</h3>
                         <div className="space-y-3">
                             <p className="text-sm text-gray-600 dark:text-gray-400">
-                                You have successfully generated a zero-knowledge proof that you solved the Sudoku puzzle without revealing your solution.
+                                You have successfully generated a cryptographic proof that you solved the Sudoku puzzle correctly.
                             </p>
-                            <p className="text-sm font-medium">
-                                The proof has been verified and recorded. Your achievement is now cryptographically proven!
-                            </p>
-                            {proofResult.hash && (
-                                <div className="text-xs bg-gray-200 dark:bg-gray-700 p-2 rounded font-mono overflow-x-auto">
-                                    <span className="font-semibold">Proof Hash:</span> {proofResult.hash}
-                                </div>
-                            )}
                         </div>
                     </div>
                 )}

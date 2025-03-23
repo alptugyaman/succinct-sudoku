@@ -6,7 +6,7 @@ import { SudokuGrid } from './sudoku';
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 /**
- * Generates a ZKP proof for a Sudoku solution
+ * Validates a Sudoku solution
  */
 export async function generateProof(initialBoard: SudokuGrid, solution: SudokuGrid) {
     try {
@@ -21,18 +21,21 @@ export async function generateProof(initialBoard: SudokuGrid, solution: SudokuGr
 
         // Set a timeout for the fetch request
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 seconds timeout
+        const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes timeout
 
-        // Prepare request body
+        // Prepare request body - correct data structure
         const requestBody = {
-            initial_board: processedInitialBoard,
+            board: processedInitialBoard,
             solution: processedSolution
         };
 
-        const response = await fetch(`${API_BASE_URL}/api/prove`, {
+        console.log('Sending request with body:', JSON.stringify(requestBody, null, 2));
+
+        const response = await fetch(`${API_BASE_URL}/validate-sudoku`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Accept': 'application/json'
             },
             body: JSON.stringify(requestBody),
             signal: controller.signal
@@ -42,57 +45,33 @@ export async function generateProof(initialBoard: SudokuGrid, solution: SudokuGr
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-            throw new Error(`Prove API error: ${response.status} ${response.statusText}`);
+            // Try to extract detailed error message from response
+            let errorDetail = '';
+            try {
+                const errorData = await response.json();
+                errorDetail = errorData.message || errorData.error || JSON.stringify(errorData);
+            } catch (e) {
+                // If response is not JSON, just use status text
+                errorDetail = response.statusText;
+            }
+
+            throw new Error(`Validate Sudoku API error: ${response.status} ${errorDetail}`);
         }
 
         const data = await response.json();
-        return data.job_id; // Return the job ID
-    } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') {
-            throw new Error('API isteği zaman aşımına uğradı. Lütfen internet bağlantınızı kontrol edin veya daha sonra tekrar deneyin.');
-        } else if (error instanceof Error && error.message && error.message.includes('Failed to fetch')) {
-            throw new Error('API sunucusuna bağlanılamadı. Lütfen backend API\'nin çalıştığından emin olun.');
+
+        // Check if validation was successful
+        if (!data.is_valid) {
+            throw new Error('Sudoku solution is not valid');
         }
 
-        throw error;
-    }
-}
-
-/**
- * Polls the status of a proof generation job
- */
-export async function pollProofStatus(jobId: string) {
-    if (!jobId) {
-        throw new Error('Invalid job ID');
-    }
-
-    try {
-        // Set a timeout for the fetch request
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 seconds timeout
-
-        const response = await fetch(`${API_BASE_URL}/api/status/${jobId}`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            signal: controller.signal
-        });
-
-        // Clear the timeout
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-            throw new Error(`Status API error: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        // Return the response data (it has the is_valid and proof_generated fields)
         return data;
     } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
-            throw new Error('API isteği zaman aşımına uğradı. Lütfen internet bağlantınızı kontrol edin veya daha sonra tekrar deneyin.');
+            throw new Error('API request timed out. Please check your internet connection and try again later.');
         } else if (error instanceof Error && error.message && error.message.includes('Failed to fetch')) {
-            throw new Error('API sunucusuna bağlanılamadı. Lütfen backend API\'nin çalıştığından emin olun.');
+            throw new Error('Could not connect to the API server. Please ensure the backend API is running.');
         }
 
         throw error;
