@@ -18,7 +18,7 @@ export function SudokuGame() {
             // Initialize with an empty board but don't start the timer
             startNewGame('easy', false);
         }
-    }, []);
+    }, [gameStarted, startNewGame]);
 
     const handleStartGame = () => {
         // Start a new game when the user clicks Start

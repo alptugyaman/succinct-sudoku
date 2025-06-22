@@ -1,7 +1,6 @@
 'use client';
 
 import { useGameStore } from '@/lib/store';
-import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { ResultModal } from './result-modal';
 
@@ -107,7 +106,6 @@ export function GameControls() {
                 <ResultModal
                     isCorrect={isCorrectSolution}
                     elapsedTime={elapsedTime}
-                    onClose={handleCloseModal}
                     onNewGame={handleNewGame}
                     originalGrid={originalGrid}
                     currentGrid={grid}

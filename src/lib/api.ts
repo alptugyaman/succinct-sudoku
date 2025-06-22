@@ -3,7 +3,7 @@ import { SudokuGrid } from './sudoku';
 // Harici backend API URL'i
 // Eğer backend API farklı bir portta çalışıyorsa, bu değeri güncelleyin
 // veya .env.local dosyasında NEXT_PUBLIC_API_URL değişkenini ayarlayın
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 /**
  * Validates a Sudoku solution
@@ -50,7 +50,7 @@ export async function generateProof(initialBoard: SudokuGrid, solution: SudokuGr
             try {
                 const errorData = await response.json();
                 errorDetail = errorData.message || errorData.error || JSON.stringify(errorData);
-            } catch (e) {
+            } catch {
                 // If response is not JSON, just use status text
                 errorDetail = response.statusText;
             }

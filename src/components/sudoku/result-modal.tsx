@@ -17,14 +17,13 @@ interface ResultModalProps {
 export function ResultModal({
     isCorrect,
     elapsedTime,
-    onClose,
     onNewGame,
     originalGrid,
     currentGrid
-}: ResultModalProps) {
+}: Omit<ResultModalProps, 'onClose'>) {
     const [isVisible, setIsVisible] = useState(false);
     const [isGeneratingProof, setIsGeneratingProof] = useState(false);
-    const [proofResult, setProofResult] = useState<any>(null);
+    const [proofResult, setProofResult] = useState<{ status: string; message: string } | null>(null);
     const [proofError, setProofError] = useState<string | null>(null);
     const [proofStep, setProofStep] = useState<string>('Initiating proof generation... This may take several minutes to complete.');
 
@@ -39,14 +38,14 @@ export function ResultModal({
     const getMotivationalMessage = () => {
         if (isCorrect) {
             if (elapsedTime < 30) {
-                return "Wow! That was lightning fast! You're a Sudoku master!";
+                return "Wow! That was lightning fast! You&apos;re a Sudoku master!";
             } else if (elapsedTime < 60) {
                 return "Great job! You solved it quickly and accurately!";
             } else {
                 return "Well done! Your persistence paid off!";
             }
         } else {
-            return "Don't worry! Sudoku takes practice. Keep trying!";
+            return "Don&apos;t worry! Sudoku takes practice. Keep trying!";
         }
     };
 
@@ -66,7 +65,7 @@ export function ResultModal({
                 "Not Quite Right",
                 "Keep Trying!",
                 "Almost There!",
-                "Don't Give Up!",
+                "Don&apos;t Give Up!",
                 "Practice Makes Perfect!"
             ];
             return titles[Math.floor(Math.random() * titles.length)];
@@ -144,14 +143,8 @@ export function ResultModal({
     };
 
     // Handle proof completion
-    const handleProofComplete = (result: any) => {
+    const handleProofComplete = (result: { status: string; message: string }) => {
         setProofResult(result);
-        setIsGeneratingProof(false);
-    };
-
-    // Handle proof error
-    const handleProofError = (error: string) => {
-        setProofError(error);
         setIsGeneratingProof(false);
     };
 
@@ -196,7 +189,7 @@ export function ResultModal({
                     <div className="mt-2 p-4 bg-gray-100 dark:bg-gray-800 rounded-md">
                         <h3 className="text-lg font-semibold mb-2">Generate a Proof of Your Solution</h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                            Create a ZKP that you've correctly solved the Sudoku puzzle. The proof generation process may take several minutes to complete.
+                            Create a ZKP that you&apos;ve correctly solved the Sudoku puzzle. The proof generation process may take several minutes to complete.
                         </p>
                         <button
                             className="w-full px-4 py-2 bg-[#fe11c5] hover:bg-[#fe11c5]/80 text-white font-medium border-2 border-gray-800 dark:border-gray-600 transition-colors"

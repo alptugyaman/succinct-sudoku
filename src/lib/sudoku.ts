@@ -21,7 +21,8 @@ export function createSolvedGrid(): SudokuGrid {
 /**
  * Creates a new Sudoku puzzle with the specified difficulty
  */
-export function createPuzzle(difficulty: Difficulty): SudokuGrid {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function createPuzzle(_difficulty: Difficulty): SudokuGrid {
     // Create a solved grid first
     const solvedGrid = createSolvedGrid();
 

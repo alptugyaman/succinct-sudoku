@@ -55,7 +55,7 @@ export function StartScreen({ onStart }: StartScreenProps) {
                     <ul className="space-y-2 text-gray-600 dark:text-gray-300 list-disc pl-5">
                         <li>Click on an empty cell to select it</li>
                         <li>Use the number pad below the grid to enter a number</li>
-                        <li>Use the "Clear" button to remove a number</li>
+                        <li>Use the &quot;Clear&quot; button to remove a number</li>
                         <li>The game is complete when all cells are filled correctly</li>
                         <li>Your time will start when you make your first move</li>
                     </ul>
